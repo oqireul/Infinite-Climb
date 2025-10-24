@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infinite Leap: Tower Climber (Time Trial)</title>
+    <!-- Load Tailwind CSS for utility classes and structure -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for the game look and feel */
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        body {
+            background-color: #121212;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            font-family: 'Press Start 2P', cursive;
+            color: #E0E0E0;
+        }
+
+        #game-container {
+            background-color: #1f1f1f;
+            box-shadow: 0 10px 30px rgba(0, 255, 255, 0.2);
+            border: 4px solid #00FFFF;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 800px;
+            height: auto;
+            max-height: 90vh;
+        }
+
+        canvas {
+            background-color: #000000;
+            border: 2px solid #00FFFF;
+            border-radius: 8px;
+            touch-action: none; /* Important for preventing mobile browser gestures */
+        }
+
+        .game-ui {
+            width: 100%;
+            margin-top: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 10px;
+            font-size: 0.75rem;
+            text-align: center;
+        }
+        
+        /* Timer style */
+        .time-display {
+            color: #FF4081; /* Pink for time */
+            min-width: 150px;
+        }
+
+        .message-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            border: 5px solid #FF4081;
+            border-radius: 10px;
+            padding: 30px 40px;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(255, 64, 129, 0.8);
+            z-index: 1000;
+            display: none;
+        }
+
+        /* NEW: Full-screen overlay for termination */
+        .termination-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #121212; /* Black background to simulate crash */
+            display: none; /* Starts hidden */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 2000;
+        }
+
+        .button-primary {
+            background-color: #FF4081;
+            color: #FFFFFF;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+            border: none;
+            box-shadow: 0 4px #C51162;
+        }
+
+        .button-primary:hover {
+            background-color: #FF80AB;
+        }
+
+        .button-primary:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 #C51162;
+        }
+
+        /* Secondary Button Style for "I'M DONE" */
+        .button-secondary {
+            background-color: #3f3f3f;
+            color: #E0E0E0;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+            border: none;
+            box-shadow: 0 4px #262626;
+        }
+
+        .button-secondary:hover {
+            background-color: #525252;
+        }
+
+        .button-secondary:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 #262626;
+        }
+
+        .controls-info {
+            font-size: 0.6rem;
+            text-align: center;
+            margin-top: 10px;
+            line-height: 1.5;
+            color: #9E9E9E;
+        }
+
+        /* Mobile specific styles (small screens) */
+        @media (max-width: 640px) {
+            #game-container {
+                border-radius: 0;
+                border-left: none;
+                border-right: none;
+                max-width: 100%;
+                padding: 10px 0;
+                min-height: 100vh;
+            }
+            .game-ui {
+                flex-wrap: wrap; /* Allow wrapping */
+                justify-content: center;
+                gap: 10px;
+                padding: 0 5px;
+            }
+            .score-display, .level-display, .time-display {
+                font-size: 0.6rem;
+                flex: 1 1 45%; 
+                min-width: 120px;
+            }
+            #restartButton {
+                flex: 1 1 100%; 
+            }
+            .button-primary, .button-secondary {
+                padding: 8px 15px;
+                font-size: 0.7rem;
+            }
+            .controls-info {
+                font-size: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <h1 class="text-xl md:text-2xl font-bold mb-4 text-cyan-300">INFINITE CLIMB</h1>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div class="game-ui">
+        <div id="scoreDisplay" class="score-display text-cyan-300">HEIGHT: 0m</div>
+        <div id="timeDisplay" class="time-display">TIME: 00:00.00</div>
+        <button id="restartButton" class="button-primary">RESTART</button>
+        <div id="levelDisplay" class="level-display text-cyan-300">LEVEL: 1</div>
+    </div>
+
+    <div class="controls-info">
+        CONTROLS: A/D or $\leftarrow$/$\rightarrow$ to Move, SPACE or $\uparrow$ to Jump (Double Jump Enabled!)
+    </div>
+</div>
+
+<!-- Game Over Message Box -->
+<div id="messageBox" class="message-box">
+    <h2 class="text-2xl text-red-500 mb-4">FELL TO YOUR DOOM!</h2>
+    <p id="finalHeight" class="text-xl mb-2 text-white font-mono"></p>
+    <p id="finalTime" class="text-xl mb-6 text-white font-mono"></p>
+    <div class="flex justify-center gap-4">
+        <button id="messageRestartButton" class="button-primary">RETRY</button>
+        <button id="doneButton" class="button-secondary">I'M DONE</button>
+    </div>
+</div>
+
+<!-- NEW: Full-screen Game Terminated Overlay -->
+<div id="terminationOverlay" class="termination-overlay">
+    <h2 class="text-3xl text-cyan-300 mb-8 animate-pulse">GAME TERMINATED</h2>
+    <!-- This button is hidden by default and shown after 5s -->
+    <button id="justKiddingButton" class="button-primary opacity-0 transition-opacity duration-500 hidden" 
+            style="margin-top: 50px; font-size: 0.8rem;"></button>
+</div>
+<!-- END NEW -->
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const gameContainer = document.getElementById('game-container'); // NEW
+        const terminationOverlay = document.getElementById('terminationOverlay'); // NEW
+        const justKiddingButton = document.getElementById('justKiddingButton'); // NEW
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const levelDisplay = document.getElementById('levelDisplay');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const messageBox = document.getElementById('messageBox');
+        const finalHeightText = document.getElementById('finalHeight');
+        const finalTimeText = document.getElementById('finalTime');
+        const restartButton = document.getElementById('restartButton');
+        const messageRestartButton = document.getElementById('messageRestartButton');
+        const doneButton = document.getElementById('doneButton');
+
+        // --- Game Constants ---
+        const PLAYER_COLOR = '#FF9800'; 
+        const PLATFORM_COLOR = '#4CAF50'; 
+        const SKY_COLOR = '#000000'; 
+        const PLATFORM_HEIGHT = 20;
+        const GRAVITY = 0.6;
+        const JUMP_VELOCITY = -12;
+        const RUN_SPEED = 5;
+        const MAX_JUMPS = 2; 
+        const LEVEL_UP_SCORE = 50; 
+        const CAMERA_Y_SMOOTHING = 0.1; 
+
+        // --- Game State ---
+        let state = {
+            player: {
+                x: 0,
+                y: 0,
+                width: 30,
+                height: 50,
+                velX: 0,
+                velY: 0,
+                onGround: false,
+                jumpsLeft: MAX_JUMPS,
+            },
+            platforms: [],
+            cameraX: 0, 
+            cameraY: 0, 
+            maxHeightReached: 0, 
+            initialY: 0, 
+            initialX: 0, 
+            score: 0,
+            level: 1,
+            keys: {
+                left: false,
+                right: false,
+                jump: false,
+            },
+            canJumpPress: true, 
+            isGameOver: false,
+            gameStarted: false, 
+            startTime: 0,
+            elapsedTime: 0,
+            timerRunning: false,
+            lastPlatformY: 0, 
+            animationFrameId: null,
+            canvasWidth: 0,
+            canvasHeight: 0,
+        };
+
+        // --- Utility Functions ---
+
+        /**
+         * Sets canvas dimensions based on container and screen size.
+         */
+        function resizeCanvas() {
+            const container = document.getElementById('game-container');
+            let width = container.clientWidth - 40; 
+            let height = Math.min(width * (9/16), window.innerHeight * 0.7); 
+
+            // Set a minimum size
+            width = Math.max(width, 300);
+            height = Math.max(height, 200);
+
+            canvas.width = width;
+            canvas.height = height;
+
+            state.canvasWidth = width;
+            state.canvasHeight = height;
+        }
+        
+        /**
+         * Formats and updates the time display element.
+         * @param {number} timeMs The time in milliseconds to display. Defaults to current elapsed time.
+         */
+        function updateTimeDisplay(timeMs = state.elapsedTime) {
+            const totalMilliseconds = timeMs;
+            const minutes = String(Math.floor(totalMilliseconds / 60000)).padStart(2, '0');
+            const seconds = String(Math.floor((totalMilliseconds % 60000) / 1000)).padStart(2, '0');
+            const centiseconds = String(Math.floor((totalMilliseconds % 1000) / 10)).padStart(2, '0');
+            
+            const formattedTime = `${minutes}:${seconds}.${centiseconds}`;
+            timeDisplay.textContent = `TIME: ${formattedTime}`;
+            return formattedTime;
+        }
+
+        /**
+         * Generates a new random platform and adds it to the world.
+         */
+        function generatePlatform(lastPlatform) {
+            // Horizontal movement range 
+            const minMoveX = -state.canvasWidth * 0.2; 
+            const maxMoveX = state.canvasWidth * 0.2;
+
+            // Vertical climb (always generate above, smaller Y value)
+            const minClimbY = -120; // Max climb up
+            const maxClimbY = -50;  // Min climb up
+
+            const minWidth = 80;
+            const maxWidth = 150;
+
+            // X position: Based on last platform's X plus random horizontal movement
+            let newX = lastPlatform.x + (Math.random() * (maxMoveX - minMoveX) + minMoveX);
+            
+            // Implement Global Boundaries for X-Clamping
+            const maxWorldHalfWidth = state.canvasWidth * 1.5; 
+            const globalMaxX = state.initialX + maxWorldHalfWidth;
+            const globalMinX = state.initialX - maxWorldHalfWidth;
+
+            // Clamp newX to global boundaries 
+            newX = Math.min(Math.max(newX, globalMinX), globalMaxX - maxWidth);
+            
+            // Y position: Must be higher (smaller Y value)
+            let newY = lastPlatform.y + (Math.random() * (maxClimbY - minClimbY) + minClimbY);
+            
+            // Ensure platform respects minClimb
+            newY = Math.max(newY, lastPlatform.y + minClimbY);
+
+
+            const width = Math.random() * (maxWidth - minWidth) + minWidth;
+
+            const newPlatform = {
+                x: newX,
+                y: newY,
+                width: width,
+                height: PLATFORM_HEIGHT,
+            };
+
+            state.platforms.push(newPlatform);
+            state.lastPlatformY = newPlatform.y;
+        }
+
+        /**
+         * Initializes the game state and starts the game loop.
+         */
+        function initGame() {
+            // Ensure the game UI is visible and the overlays are hidden
+            gameContainer.style.display = 'flex';
+            terminationOverlay.style.display = 'none';
+            messageBox.style.display = 'none';
+
+            resizeCanvas();
+
+            // Initial ground platform setup
+            const initialGroundY = state.canvasHeight - PLATFORM_HEIGHT;
+            const initialGround = {
+                x: state.canvasWidth / 2 - 200, 
+                y: initialGroundY,
+                width: 400,
+                height: PLATFORM_HEIGHT,
+            };
+
+            state.player = {
+                x: initialGround.x + initialGround.width / 2 - 15, 
+                y: initialGround.y - 50,
+                width: 30,
+                height: 50,
+                velX: 0,
+                velY: 0,
+                onGround: false,
+                jumpsLeft: MAX_JUMPS, 
+            };
+
+            state.platforms = [initialGround];
+            state.cameraX = state.player.x - state.canvasWidth / 2;
+            state.cameraY = state.player.y - state.canvasHeight / 2;
+            
+            // Set initial position constants
+            state.initialY = initialGroundY; 
+            state.initialX = initialGround.x + initialGround.width / 2; 
+
+            state.maxHeightReached = state.player.y;
+            state.score = 0;
+            state.level = 1;
+            state.isGameOver = false;
+            state.canJumpPress = true; 
+            
+            // Reset Time State
+            state.gameStarted = false;
+            state.startTime = 0;
+            state.elapsedTime = 0;
+            state.timerRunning = false;
+            updateTimeDisplay(0); 
+
+            // Generate initial platforms
+            let currentPlatform = initialGround;
+            for (let i = 0; i < 15; i++) {
+                generatePlatform(currentPlatform);
+                currentPlatform = state.platforms[state.platforms.length - 1];
+            }
+
+            if (state.animationFrameId) {
+                cancelAnimationFrame(state.animationFrameId);
+            }
+            gameLoop();
+        }
+
+        // --- Game Logic ---
+
+        /**
+         * Updates the player's position, velocity, and handles input.
+         */
+        function updatePlayer() {
+            const player = state.player;
+            const maxVelX = RUN_SPEED + state.level; 
+
+            // Check if player has moved to start the timer
+            if (!state.gameStarted && (state.keys.left || state.keys.right || state.keys.jump)) {
+                state.gameStarted = true;
+                state.timerRunning = true;
+                state.startTime = performance.now();
+            }
+
+            // Apply horizontal acceleration based on keys
+            if (state.keys.left) {
+                player.velX = Math.max(player.velX - 1, -maxVelX);
+            } else if (state.keys.right) {
+                player.velX = Math.min(player.velX + 1, maxVelX);
+            } else {
+                // Apply friction
+                player.velX *= 0.8;
+                if (Math.abs(player.velX) < 0.1) player.velX = 0;
+            }
+
+            // --- Double Jump Logic ---
+            if (state.keys.jump && state.canJumpPress) {
+                if (player.onGround) {
+                    player.velY = JUMP_VELOCITY;
+                    player.onGround = false;
+                    player.jumpsLeft = MAX_JUMPS - 1; 
+                } else if (player.jumpsLeft > 0) {
+                    player.velY = JUMP_VELOCITY;
+                    player.jumpsLeft--; 
+                }
+                state.canJumpPress = false; 
+            }
+
+            if (!state.keys.jump) {
+                state.canJumpPress = true;
+            }
+            
+            // Gravity and movement
+            player.velY += GRAVITY;
+            player.y += player.velY;
+            player.x += player.velX;
+
+            player.onGround = false;
+        }
+
+        /**
+         * Checks for collisions between the player and platforms.
+         */
+        function checkCollisions() {
+            const player = state.player;
+
+            for (let i = 0; i < state.platforms.length; i++) {
+                const p = state.platforms[i];
+
+                const colX = player.x < p.x + p.width && player.x + player.width > p.x;
+                const colY = player.y < p.y + p.height && player.y + player.height > p.y;
+
+                if (colX && colY) {
+                    // Landing on top
+                    if (player.velY >= 0 && (player.y + player.height - player.velY) <= p.y) {
+                        player.y = p.y - player.height; 
+                        player.velY = 0;               
+                        player.onGround = true;        
+                        player.jumpsLeft = MAX_JUMPS;  
+                    }
+                }
+            }
+        }
+
+        /**
+         * Updates the camera position, score, and manages platform generation/cleanup.
+         */
+        function updateWorld() {
+            const player = state.player;
+            const canvasW = state.canvasWidth;
+            const canvasH = state.canvasHeight;
+
+            // 1. Camera Movement
+            const targetCameraX = player.x - canvasW / 2 + player.width / 2;
+            state.cameraX = targetCameraX; 
+
+            const targetCameraY = player.y - canvasH / 2 + player.height / 2;
+            state.cameraY = state.cameraY * (1 - CAMERA_Y_SMOOTHING) + targetCameraY * CAMERA_Y_SMOOTHING;
+
+
+            // 2. Platform Generation
+            const lastPlatform = state.platforms[state.platforms.length - 1];
+            
+            if (lastPlatform && lastPlatform.y - state.cameraY < canvasH * 0.2) {
+                 // Generate only 2 new platforms at a time
+                 for (let i = 0; i < 2; i++) {
+                    if (state.platforms.length > 0) {
+                        generatePlatform(state.platforms[state.platforms.length - 1]);
+                    }
+                 }
+            }
+
+            // 3. Platform Cleanup
+            state.platforms = state.platforms.filter(p => p.y - state.cameraY > -canvasH * 2);
+
+            // 4. Update Score 
+            if (player.y < state.maxHeightReached) {
+                state.maxHeightReached = player.y;
+            }
+            state.score = Math.max(0, Math.floor((state.initialY - state.maxHeightReached) / 10));
+
+            // Level Up logic
+            const newLevel = Math.floor(state.score / LEVEL_UP_SCORE) + 1;
+            if (newLevel > state.level) {
+                state.level = newLevel;
+            }
+
+            // 5. Game Over check: Player falls too far below the camera view
+            if (player.y - state.cameraY > canvasH * 0.8) {
+                endGame();
+            }
+
+            // Update UI
+            scoreDisplay.textContent = `HEIGHT: ${state.score}m`;
+            levelDisplay.textContent = `LEVEL: ${state.level}`;
+        }
+
+        // --- Drawing Functions ---
+
+        /**
+         * Draws the game world (platforms and player)
+         */
+        function draw() {
+            // Clear the canvas
+            ctx.fillStyle = SKY_COLOR;
+            ctx.fillRect(0, 0, state.canvasWidth, state.canvasHeight);
+
+            // Draw Platforms
+            ctx.fillStyle = PLATFORM_COLOR;
+            state.platforms.forEach(p => {
+                ctx.fillRect(
+                    p.x - state.cameraX,
+                    p.y - state.cameraY, 
+                    p.width,
+                    p.height
+                );
+            });
+
+            // Draw Player
+            ctx.fillStyle = PLAYER_COLOR;
+            ctx.fillRect(
+                state.player.x - state.cameraX,
+                state.player.y - state.cameraY, 
+                state.player.width,
+                state.player.height
+            );
+
+        }
+
+        // --- Game Flow Control ---
+
+        function endGame() {
+            state.isGameOver = true;
+            state.timerRunning = false; // Stop the timer
+            cancelAnimationFrame(state.animationFrameId);
+            
+            // Format and display final score and time
+            finalHeightText.textContent = `Max Height: ${state.score}m (Level ${state.level})`;
+            const finalTime = updateTimeDisplay(state.elapsedTime);
+            finalTimeText.textContent = `Time Survived: ${finalTime}`;
+            
+            messageBox.style.display = 'block';
+        }
+
+        // --- Event Handlers ---
+        
+        // Handler for the "I'm Done" button (NEW logic)
+        function handleDone() {
+            // 1. Hide the game UI and Game Over box
+            gameContainer.style.display = 'none';
+            messageBox.style.display = 'none';
+            
+            // 2. Show the termination overlay
+            terminationOverlay.style.display = 'flex';
+            
+            // 3. Reset the kidding button state (hidden and faded)
+            justKiddingButton.classList.add('hidden', 'opacity-0');
+            justKiddingButton.classList.remove('opacity-100');
+
+            // 4. Timer to show the "Just Kidding" button after 5 seconds (5000ms)
+            setTimeout(() => {
+                // Only show if the termination screen is still active
+                if (terminationOverlay.style.display === 'flex') {
+                    justKiddingButton.textContent = "just kidding, let me in";
+                    justKiddingButton.classList.remove('hidden', 'opacity-0');
+                    justKiddingButton.classList.add('opacity-100');
+                }
+            }, 5000);
+        }
+
+        function gameLoop() {
+            if (state.isGameOver) return;
+
+            // Stopwatch Logic
+            if (state.timerRunning) {
+                state.elapsedTime = performance.now() - state.startTime;
+                updateTimeDisplay();
+            }
+
+            updatePlayer();
+            checkCollisions();
+            updateWorld();
+            draw();
+
+            state.animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function handleKeyDown(e) {
+            if (state.isGameOver) return;
+            
+            // Start the game timer on the first movement input
+            const isMovementKey = e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'ArrowRight' || e.key === 'd' || e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w';
+            if (!state.gameStarted && isMovementKey) {
+                state.gameStarted = true;
+                state.timerRunning = true;
+                state.startTime = performance.now();
+            }
+
+            switch (e.key) {
+                case 'ArrowLeft':
+                case 'a':
+                case 'A':
+                    state.keys.left = true;
+                    e.preventDefault();
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                case 'D':
+                    state.keys.right = true;
+                    e.preventDefault();
+                    break;
+                case ' ':
+                case 'ArrowUp':
+                case 'w':
+                case 'W':
+                    state.keys.jump = true;
+                    e.preventDefault();
+                    break;
+            }
+        }
+
+        function handleKeyUp(e) {
+            switch (e.key) {
+                case 'ArrowLeft':
+                case 'a':
+                case 'A':
+                    state.keys.left = false;
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                case 'D':
+                    state.keys.right = false;
+                    break;
+                case ' ':
+                case 'ArrowUp':
+                case 'w':
+                case 'W':
+                    state.keys.jump = false;
+                    break;
+            }
+        }
+        
+        // --- Initialization ---
+
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+        window.addEventListener('resize', initGame); 
+
+        // Main restart buttons
+        restartButton.addEventListener('click', initGame);
+        messageRestartButton.addEventListener('click', initGame);
+        
+        // Termination and Secret Comeback
+        doneButton.addEventListener('click', handleDone); 
+        justKiddingButton.addEventListener('click', initGame); // New button uses existing initGame function
+
+        initGame(); 
+    });
+</script>
